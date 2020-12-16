@@ -1,0 +1,11 @@
+# Demo parameters for training of HOW method R18
+
+__template__: train_how_r50-.yml
+
+training:
+  optimizer:
+    lr: 5.e-6 # SGD learning rate
+
+model:
+  architecture: resnet18 # Backbone network
+  skip_layer: 0 # How many layers of blocks will be skipped, counting from end

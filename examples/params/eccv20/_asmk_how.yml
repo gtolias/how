@@ -1,0 +1,27 @@
+index:
+  gpu_id: 0 # Gpu id to use, None to run on cpu
+
+# Steps
+
+train_codebook:
+  codebook:
+    size: 65536 # Number of visual words (i.e. clusters of local features) in the codebook
+
+build_ivf:
+  kernel:
+    binary: True # Binarization option in the asmk
+  ivf:
+    use_idf: False # IDF weighting in the inverted file
+
+  quantize:
+    multiple_assignment: 1 # Number of assignments for the db vectors
+  aggregate: {}
+
+query_ivf:
+  quantize:
+    multiple_assignment: 5 # Number of assignments for the query vectors
+  aggregate: {}
+  search: {}
+  similarity:
+    similarity_threshold: 0.0 # Feature similarity threshold
+    alpha: 3.0 # Feature similarity exponent

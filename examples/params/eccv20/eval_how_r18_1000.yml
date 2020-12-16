@@ -1,0 +1,6 @@
+# Demo parameters for evaluation of HOW method R18 n=1000
+
+__template__: eval_how_r50-_1000.yml
+
+demo_eval:
+  net_path: http://ptak.felk.cvut.cz/personal/toliageo/share/how/models/how_r18.pth

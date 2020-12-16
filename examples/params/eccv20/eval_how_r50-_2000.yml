@@ -1,0 +1,7 @@
+# Demo parameters for evaluation of HOW method -R50 n=2000
+
+__template__: eval_how_r50-_1000.yml
+
+evaluation:
+  inference:
+    features_num: 2000
