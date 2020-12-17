@@ -48,19 +48,19 @@ pip3 install -r requirements.txt
 
 Reproducing results from **Table 2.** with the publicly available models
 
-- R18<sub>how</sub> (n = 1000): &nbsp; `examples/demo_how.py eval examples/params/eccv20/how_r18_1000.yml -e official_how_r18_1000` &ensp; _ROxf (M): 75.1, RPar (M): 79.4_
-- -R50<sub>how</sub> (n = 1000): &nbsp; `examples/demo_how.py eval examples/params/eccv20/how_r50-_1000.yml -e official_how_r50-_1000` &ensp; _ROxf (M): 78.3, RPar (M): 80.1_
-- -R50<sub>how</sub> (n = 2000): &nbsp; `examples/demo_how.py eval examples/params/eccv20/how_r50-_2000.yml -e official_how_r50-_2000` &ensp; _ROxf (M): 79.4, RPar (M): 81.6_
+- R18<sub>how</sub> (n = 1000): &nbsp; `examples/demo_how.py eval examples/params/eccv20/eval_how_r18_1000.yml -e official_how_r18_1000` &ensp; _ROxf (M): 75.1, RPar (M): 79.4_
+- -R50<sub>how</sub> (n = 1000): &nbsp; `examples/demo_how.py eval examples/params/eccv20/eval_how_r50-_1000.yml -e official_how_r50-_1000` &ensp; _ROxf (M): 78.3, RPar (M): 80.1_
+- -R50<sub>how</sub> (n = 2000): &nbsp; `examples/demo_how.py eval examples/params/eccv20/eval_how_r50-_2000.yml -e official_how_r50-_2000` &ensp; _ROxf (M): 79.4, RPar (M): 81.6_
 
 
 ### Training HOW models
 
 - R18<sub>how</sub>:
-    - train: `examples/demo_how.py train examples/params/eccv20/how_r18.yml -e train_how_r18`
-    - eval (n = 1000): `examples/demo_how.py eval examples/params/eccv20/how_r18_1000.yml -ml train_how_r18`
+    - train: `examples/demo_how.py train examples/params/eccv20/train_how_r18.yml -e train_how_r18`
+    - eval (n = 1000): `examples/demo_how.py eval examples/params/eccv20/train_how_r18_1000.yml -ml train_how_r18`
 - -R50<sub>how</sub>:
-    - train: `examples/demo_how.py train examples/params/eccv20/how_r50-.yml -e train_how_r50-`
-    - eval (n = 1000): `examples/demo_how.py eval examples/params/eccv20/how_r50-_1000.yml -ml train_how_r50-`
-    - eval (n = 2000): `examples/demo_how.py eval examples/params/eccv20/how_r50-_2000.yml -ml train_how_r50-`
+    - train: `examples/demo_how.py train examples/params/eccv20/eval_how_r50-.yml -e train_how_r50-`
+    - eval (n = 1000): `examples/demo_how.py eval examples/params/eccv20/eval_how_r50-_1000.yml -ml train_how_r50-`
+    - eval (n = 2000): `examples/demo_how.py eval examples/params/eccv20/eval_how_r50-_2000.yml -ml train_how_r50-`
 
 Dataset shuffling during the training is done according to the cirtorch package; randomness in the results is caused by cudnn and by kmeans for codebook creation during evaluation.
