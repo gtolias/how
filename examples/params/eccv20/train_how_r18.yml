@@ -1,10 +1,10 @@
 # Demo parameters for training of HOW method R18
 
-__template__: train_how_r50-.yml
+__template__: _train_how.yml
 
 training:
   optimizer:
-    lr: 5.e-6 # SGD learning rate
+    lr: 5.e-6 # Adam learning rate
 
 model:
   architecture: resnet18 # Backbone network

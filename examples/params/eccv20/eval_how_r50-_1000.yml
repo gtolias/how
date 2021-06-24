@@ -1,26 +1,6 @@
 # Demo parameters for evaluation of HOW method -R50 n=1000
 
-experiment: null # Name of the experiment folder, if null, the yaml file name will be used
+__template__: _eval_how.yml
 
 demo_eval:
-  data_folder: how_data # Data path relative to the package root (can be absolute path)
-  exp_folder: how_experiments # Experiment path relative to the package root (can be absolute path)
-  gpu_id: 0 # Gpu id to perform inference on (asmk can have a different gpu id)
-  net_path: http://ptak.felk.cvut.cz/personal/toliageo/share/how/models/how_r50-.pth # Model path (can be url or path relative to exp_folder)
-
-evaluation:
-  inference:
-    image_size: 1024 # Images will be downscaled to this size prior processing with the network
-    scales: [2.0, 1.414, 1.0, 0.707, 0.5, 0.353, 0.25] # Scales for multiscale inference
-    features_num: 1000 # Number of local features to keep (sorted by attention)
-
-  global_descriptor:
-    datasets: [] # Datasets for evaluation of global descriptor
-  local_descriptor:
-    datasets: [val_eccv20, roxford5k, rparis6k] # Datasets for evaluation of local descriptor with asmk
-    # Codebook training options are distinct (image size is kept)
-    codebook_training:
-      images: 20000 # Number of images for training (taken from beginning of dataset)
-      scales: [1] # Scales for multiscale inference
-    asmk:
-      __template__: _asmk_how.yml # Load from a separate file
+  net_path: http://ptak.felk.cvut.cz/personal/toliageo/share/how/models/how_r50-.pth
