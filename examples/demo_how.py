@@ -2,6 +2,7 @@
 import os.path
 import sys
 import argparse
+import json
 import ast
 from pathlib import Path
 import yaml
@@ -37,6 +38,11 @@ def add_parameter_arguments(parser_train, parser_eval):
                              dest="evaluation.inference.features_num", type=int)
     parser_eval.add_argument("--scales", metavar="SCALES", dest="evaluation.inference.scales",
                              type=ast.literal_eval)
+    parser_eval.add_argument("--datasets-local", metavar="JSON", dest="evaluation.local_descriptor.datasets",
+                             type=json.loads)
+    parser_eval.add_argument("--step", metavar="STEP", dest="evaluation.multistep.step")
+    parser_eval.add_argument("--partition", metavar="PARTITION", dest="evaluation.multistep.partition",
+                             type=lambda x: tuple(int(y) for y in x.split("_")))
 
 
 def main(args):

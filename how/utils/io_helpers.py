@@ -69,6 +69,8 @@ def dict_deep_set(dct, key, value):
         dct[key[0]] = value
         return
 
+    if not isinstance(dct[key[0]], dict) or key[0] not in dct:
+        dct[key[0]] = {}
     dict_deep_set(dct[key[0]], key[1:], value)
 
 

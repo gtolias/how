@@ -10,7 +10,17 @@ from cirtorch.datasets.testdataset import configdataset
 def load_dataset(dataset, data_root=''):
     """Return tuple (image list, query list, bounding boxes, gnd dictionary)"""
 
-    if dataset == 'train':
+    if isinstance(dataset, dict):
+        root = os.path.join(data_root, dataset['image_root'])
+        images, qimages = None, None
+        if dataset['database_list'] is not None:
+            images = [path_join(root, x.strip("\n")) for x in open(dataset['database_list']).readlines()]
+        if dataset['query_list'] is not None:
+            qimages = [path_join(root, x.strip("\n")) for x in open(dataset['query_list']).readlines()]
+        bbxs = None
+        gnd = None
+
+    elif dataset == 'train':
         training_set = 'retrieval-SfM-120k'
         db_root = os.path.join(data_root, 'train', training_set)
         ims_root = os.path.join(db_root, 'ims')
@@ -45,6 +55,17 @@ def load_dataset(dataset, data_root=''):
         gnd = cfg['gnd']
 
     return images, qimages, bbxs, gnd
+
+
+def path_join(root, name):
+    """Perform os.path.join by default; if asterisk is present in root, substitute with the name.
+
+    >>> path_join('/data/img_*.jpg', '001')
+    '/data/img_001.jpg'
+    """
+    if "*" in root.rsplit("/", 1)[-1]:
+        return root.replace("*", name)
+    return os.path.join(root, name)
 
 
 class AverageMeter:
