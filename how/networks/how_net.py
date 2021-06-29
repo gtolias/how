@@ -7,9 +7,9 @@ import torchvision
 
 from cirtorch.networks import imageretrievalnet
 
-from how import layers
-from how.layers import functional as HF
-from how.utils import io_helpers
+from .. import layers
+from ..layers import functional as HF
+from ..utils import io_helpers
 
 NUM_WORKERS = 6
 

@@ -11,8 +11,8 @@ from torchvision import transforms
 from cirtorch.datasets.genericdataset import ImagesFromList
 
 from asmk import asmk_method, kernel as kern_pkg
-from how.networks import how_net
-from how.utils import score_helpers, data_helpers, logging
+from ..networks import how_net
+from ..utils import score_helpers, data_helpers, logging
 
 warnings.filterwarnings("ignore", r"^Possibly corrupt EXIF data", category=UserWarning)
 

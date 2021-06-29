@@ -12,8 +12,8 @@ from cirtorch.datasets.datahelpers import collate_tuples
 from cirtorch.datasets.traindataset import TuplesDataset
 from cirtorch.datasets.genericdataset import ImagesFromList
 
-from how.networks import how_net
-from how.utils import data_helpers, io_helpers, logging, plots
+from ..networks import how_net
+from ..utils import data_helpers, io_helpers, logging, plots
 from . import evaluate
 
 

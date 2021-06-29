@@ -2,7 +2,7 @@
 
 import os.path
 from cirtorch.utils.download import download_train, download_test
-from how.utils import io_helpers
+from . import io_helpers
 
 
 def download_for_eval(evaluation, demo_eval, dataset_url, globals):

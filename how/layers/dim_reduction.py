@@ -3,7 +3,7 @@
 import torch
 from torch import nn
 
-from how.utils import whitening
+from ..utils import whitening
 
 
 class ConvDimReduction(nn.Conv2d):
