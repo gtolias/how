@@ -13,7 +13,9 @@ This is the official Python/PyTorch implementation of the HOW local descriptors 
 
 
 ## Running the Code
+
 1. Install the cirtorch package (see [cirtorch github](https://github.com/filipradenovic/cnnimageretrieval-pytorch/) for details)
+
 ```
 # cirtorch
 wget "https://github.com/filipradenovic/cnnimageretrieval-pytorch/archive/v1.2.zip"

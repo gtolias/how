@@ -136,20 +136,28 @@ def initialize_training(net_parameters, training, globals):
     return optimizer, scheduler, criterion, train_loader
 
 
-def initialize_dim_reduction(net, globals, *, images, features_num):
-    """Initialize dimensionality reduction by PCA whitening from 'images' number of descriptors"""
-    if not net.dim_reduction:
-        return
+
+def extract_train_descriptors(net, globals, *, images, features_num):
+    """Extract descriptors for a given number of images from the train set"""
     if features_num is None:
         features_num = net.runtime['features_num']
 
     images = data_helpers.load_dataset('train', data_root=globals['root_path'])[0][:images]
     dataset = ImagesFromList(root='', images=images, imsize=net.runtime['image_size'], bbxs=None,
                              transform=globals["transform"])
-    des_train = how_net.extract_vectors_local(net.copy_excluding_dim_reduction(), dataset,
-                                              globals["device"],
+    des_train = how_net.extract_vectors_local(net, dataset, globals["device"],
                                               scales=net.runtime['training_scales'],
                                               features_num=features_num)[0]
+    return des_train
+
+
+def initialize_dim_reduction(net, globals, **kwargs):
+    """Initialize dimensionality reduction by PCA whitening from 'images' number of descriptors"""
+    if not net.dim_reduction:
+        return
+
+    print(">> Initializing dim reduction")
+    des_train = extract_train_descriptors(net.copy_excluding_dim_reduction(), globals, **kwargs)
     net.dim_reduction.initialize_pca_whitening(des_train)
 
 

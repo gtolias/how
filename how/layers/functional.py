@@ -67,7 +67,7 @@ def how_select_local(ms_feats, ms_masks, *, scales, features_num):
         locs[slc, 1] = height_arr.view(-1, 1).repeat(1, width).reshape(-1).to(device) # y axis
         scls[slc] = sc
 
-    keep_n = min(features_num, atts.shape[0])
+    keep_n = min(features_num, atts.shape[0]) if features_num is not None else atts.shape[0]
     idx = atts.sort(descending=True)[1][:keep_n]
 
     return desc[idx], atts[idx], locs[idx], scls[idx]

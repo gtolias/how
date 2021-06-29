@@ -44,6 +44,11 @@ def load_dataset(dataset, data_root=''):
         qimages = [images[x] for x in qidx]
         bbxs = None
 
+    elif "/" in dataset:
+        with open(dataset, 'rb') as handle:
+            db = pickle.load(handle)
+        images, qimages, bbxs, gnd = db['imlist'], db['qimlist'], None, db['gnd']
+
     else:
         cfg = configdataset(dataset, os.path.join(data_root, 'test'))
         images = [cfg['im_fname'](cfg, i) for i in range(cfg['n'])]

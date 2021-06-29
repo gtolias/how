@@ -122,7 +122,7 @@ def eval_asmk(net, inference, globals, *, datasets, codebook_training, asmk):
             results[dataset] = score_helpers.compute_map_and_log(dataset, ranks.T, gnd, logger=logger)
         else:
             with (globals["exp_path"] / f"query_results.pkl").open("wb") as handle:
-                pickle.dump({"images": images, "ranks": ranks, "scores": scores}, handle)
+                pickle.dump({"metadata": metadata, "images": images, "ranks": ranks, "scores": scores}, handle)
 
     logger.info(f"Finished asmk evaluation in {int(time.time()-time0) // 60} min")
     return results
@@ -212,7 +212,7 @@ def eval_asmk_multistep(net, inference, multistep, globals, *, datasets, codeboo
                 results[dataset] = score_helpers.compute_map_and_log(dataset, ranks.T, gnd, logger=logger)
             else:
                 with (globals["exp_path"] / f"eval/{dataset_name}.results{partition['suffix']}.pkl").open("wb") as handle:
-                    pickle.dump({"images": images, "ranks": ranks, "scores": scores}, handle)
+                    pickle.dump({"metadata": metadata, "images": images, "ranks": ranks, "scores": scores}, handle)
 
     logger.info(f"Finished asmk evaluation in {int(time.time()-time0) // 60} min")
     return results

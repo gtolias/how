@@ -50,7 +50,7 @@ class HOWNet(nn.Module):
 
     def copy_with_runtime(self, runtime):
         """Return a copy of this network with a different runtime dict"""
-        return self.__class__(self.features, self.attention, self.smoothing, self.dim_reduction, meta, runtime)
+        return self.__class__(self.features, self.attention, self.smoothing, self.dim_reduction, self.meta, runtime)
 
 
     # Methods of nn.Module

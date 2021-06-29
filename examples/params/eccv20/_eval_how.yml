@@ -4,7 +4,7 @@ experiment: null # Name of the experiment folder, if null, the yaml file name wi
 
 demo_eval:
   data_folder: how_data # Data path relative to the package root (can be absolute path)
-  exp_folder: how_experiments # Experiment path relative to the package root (can be absolute path)
+  exp_folder: how_data/experiments # Experiment path relative to the package root (can be absolute path)
   gpu_id: 0 # Gpu id to perform inference on (asmk can have a different gpu id)
   net_path: null # Model path (can be url or path relative to exp_folder)
 

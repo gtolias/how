@@ -1,3 +1,5 @@
+# Parameters for the asmk package
+
 index:
   gpu_id: 0 # Gpu id to use, None to run on cpu
 
@@ -5,7 +7,7 @@ index:
 
 train_codebook:
   codebook:
-    size: 65536 # Number of visual words (i.e. clusters of local features) in the codebook
+    size: "64k" # Number of visual words (i.e. clusters of local features) in the codebook
 
 build_ivf:
   kernel:
@@ -21,7 +23,8 @@ query_ivf:
   quantize:
     multiple_assignment: 5 # Number of assignments for the query vectors
   aggregate: {}
-  search: {}
+  search:
+    topk: null # Limit the number of results (db images) returned for each query (null means unlimited)
   similarity:
     similarity_threshold: 0.0 # Feature similarity threshold
     alpha: 3.0 # Feature similarity exponent
