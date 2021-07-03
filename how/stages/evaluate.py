@@ -7,6 +7,7 @@ import pickle
 import numpy as np
 import torch
 from torchvision import transforms
+from PIL import ImageFile
 
 from cirtorch.datasets.genericdataset import ImagesFromList
 
@@ -14,6 +15,7 @@ from asmk import asmk_method, kernel as kern_pkg
 from ..networks import how_net
 from ..utils import score_helpers, data_helpers, logging
 
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 warnings.filterwarnings("ignore", r"^Possibly corrupt EXIF data", category=UserWarning)
 
 
@@ -44,7 +46,7 @@ def evaluate_demo(demo_eval, evaluation, globals):
     if evaluation['global_descriptor']['datasets']:
         eval_global(net, evaluation['inference'], globals, **evaluation['global_descriptor'])
 
-    if evaluation['local_descriptor']['datasets'] and evaluation['multistep']:
+    if evaluation['multistep']:
         eval_asmk_multistep(net, evaluation['inference'], evaluation['multistep'], globals, **evaluation['local_descriptor'])
     elif evaluation['local_descriptor']['datasets']:
         eval_asmk(net, evaluation['inference'], globals, **evaluation['local_descriptor'])
@@ -86,43 +88,20 @@ def eval_asmk(net, inference, globals, *, datasets, codebook_training, asmk):
     logger = globals["logger"]
     logger.info("Starting asmk evaluation")
 
-    # Train codebook
-    images = data_helpers.load_dataset('train', data_root=globals['root_path'])[0]
-    images = images[:codebook_training['images']]
-    dset = ImagesFromList(root='', images=images, imsize=inference['image_size'], bbxs=None,
-                          transform=globals['transform'])
-    infer_opts = {"scales": codebook_training['scales'], "features_num": inference['features_num']}
-    des_train = how_net.extract_vectors_local(net, dset, globals["device"], **infer_opts)[0]
-    asmk = asmk_method.ASMKMethod.initialize_untrained(asmk).train_codebook(des_train)
-    logger.info(f"Codebook trained in {asmk.metadata['train_codebook']['train_time']:.1f}s")
+    asmk = asmk_method.ASMKMethod.initialize_untrained(asmk)
+    asmk = asmk_train_codebook(net, inference, globals, logger, codebook_training=codebook_training,
+                               asmk=asmk, cache_path=None)
 
     results = {}
     for dataset in datasets:
         dataset_name = dataset if isinstance(dataset, str) else dataset['name']
         images, qimages, bbxs, gnd = data_helpers.load_dataset(dataset, data_root=globals['root_path'])
-        data_opts = {"imsize": inference['image_size'], "transform": globals['transform']}
-        infer_opts = {"scales": inference['scales'], "features_num": inference['features_num']}
         logger.info(f"Evaluating '{dataset_name}'")
 
-        # Database vectors
-        dset = ImagesFromList(root='', images=images, bbxs=None, **data_opts)
-        des = how_net.extract_vectors_local(net, dset, globals["device"], **infer_opts)
-        asmk_dataset = asmk.build_ivf(des[0], des[1])
-        logger.info(f"Indexed images in {asmk_dataset.metadata['build_ivf']['index_time']:.2f}s")
-        logger.debug(f"IVF stats: {asmk_dataset.metadata['build_ivf']['ivf_stats']}")
-
-        # Query vectors
-        qdset = ImagesFromList(root='', images=qimages, bbxs=bbxs, **data_opts)
-        qdes = how_net.extract_vectors_local(net, qdset, globals["device"], **infer_opts)
-        metadata, images, ranks, scores = asmk_dataset.query_ivf(qdes[0], qdes[1])
-        logger.debug(f"Average query time (quant+aggr+search) is {metadata['query_avg_time']:.3f}s")
-
-        # Evaluate
-        if gnd is not None:
-            results[dataset] = score_helpers.compute_map_and_log(dataset, ranks.T, gnd, logger=logger)
-        else:
-            with (globals["exp_path"] / f"query_results.pkl").open("wb") as handle:
-                pickle.dump({"metadata": metadata, "images": images, "ranks": ranks, "scores": scores}, handle)
+        asmk_dataset = asmk_index_database(net, inference, globals, logger, asmk=asmk, images=images)
+        asmk_query_ivf(net, inference, globals, logger, dataset=dataset, asmk_dataset=asmk_dataset,
+                       qimages=qimages, bbxs=bbxs, gnd=gnd, results=results,
+                       cache_path=globals["exp_path"] / "query_results.pkl")
 
     logger.info(f"Finished asmk evaluation in {int(time.time()-time0) // 60} min")
     return results
@@ -130,13 +109,14 @@ def eval_asmk(net, inference, globals, *, datasets, codebook_training, asmk):
 
 def eval_asmk_multistep(net, inference, multistep, globals, *, datasets, codebook_training, asmk):
     """Evaluate local descriptors with ASMK"""
-    assert multistep['step'] in ["train_codebook", "aggregate_database", "build_ivf", "query_ivf"]
+    valid_steps = ["train_codebook", "aggregate_database", "build_ivf", "query_ivf", "aggregate_build_query"]
+    assert multistep['step'] in valid_steps, multistep['step']
 
     net.eval()
     time0 = time.time()
     logger = globals["logger"]
     (globals["exp_path"] / "eval").mkdir(exist_ok=True)
-    logger.info("Starting asmk evaluation")
+    logger.info(f"Starting asmk evaluation step '{multistep['step']}'")
 
     # Handle partitioning
     partition = {"suffix": "", "norm_start": 0, "norm_end": 1}
@@ -148,74 +128,158 @@ def eval_asmk_multistep(net, inference, multistep, globals, *, datasets, codeboo
         if multistep['step'] == "aggregate_database" or multistep['step'] == "query_ivf":
             logger.info(f"Processing partition '{total}_{index}'")
 
-    # Train codebook
-    cache_path = globals["exp_path"] / "eval/codebook.pkl"
-    if multistep['step'] == "train_codebook":
-        images = data_helpers.load_dataset('train', data_root=globals['root_path'])[0]
-        images = images[:codebook_training['images']]
-        dset = ImagesFromList(root='', images=images, imsize=inference['image_size'], bbxs=None,
-                              transform=globals['transform'])
-        infer_opts = {"scales": codebook_training['scales'], "features_num": inference['features_num']}
-        des_train = how_net.extract_vectors_local(net, dset, globals["device"], **infer_opts)[0]
-        asmk = asmk_method.ASMKMethod.initialize_untrained(asmk).train_codebook(des_train, cache_path=cache_path)
-        logger.info(f"Codebook trained in {asmk.metadata['train_codebook']['train_time']:.1f}s")
-        return
+    # Handle distractors
+    distractors_path = None
+    distractors = multistep.get("distractors")
+    if distractors:
+        distractors_path = globals["exp_path"] / f"eval/{distractors}.ivf.pkl"
 
-    asmk = asmk_method.ASMKMethod.initialize_untrained(asmk).train_codebook(None, cache_path=cache_path)
+    # Train codebook
+    asmk = asmk_method.ASMKMethod.initialize_untrained(asmk)
+    cdb_path = globals["exp_path"] / "eval/codebook.pkl"
+    if multistep['step'] == "train_codebook":
+        asmk_train_codebook(net, inference, globals, logger, codebook_training=codebook_training,
+                            asmk=asmk, cache_path=cdb_path)
+        return None
+
+    asmk = asmk.train_codebook(None, cache_path=cdb_path)
 
     results = {}
     for dataset in datasets:
-        dataset_name = dataset if isinstance(dataset, str) else dataset['name']
+        dataset_name = database_name = dataset if isinstance(dataset, str) else dataset['name']
+        if distractors and multistep['step'] != "aggregate_database":
+            dataset_name = f"{distractors}_{database_name}"
         images, qimages, bbxs, gnd = data_helpers.load_dataset(dataset, data_root=globals['root_path'])
-        data_opts = {"imsize": inference['image_size'], "transform": globals['transform']}
-        infer_opts = {"scales": inference['scales'], "features_num": inference['features_num']}
-        logger.info(f"Evaluating '{dataset_name}', step '{multistep['step']}'")
-        codebook = asmk.codebook
-        kernel = kern_pkg.ASMKKernel(codebook, **asmk.params['build_ivf']['kernel'])
+        logger.info(f"Processing dataset '{dataset_name}'")
 
         # Infer database
         if multistep['step'] == "aggregate_database":
-            start, end = int(len(images)*partition['norm_start']), int(len(images)*partition['norm_end'])
-            dset = ImagesFromList(root='', images=images[start:end], bbxs=None, **data_opts)
-            vecs, imids, *_ = how_net.extract_vectors_local(net, dset, globals["device"], **infer_opts)
-            imids += start
-            quantized = codebook.quantize(vecs, imids, **asmk.params["build_ivf"]["quantize"])
-            aggregated = kernel.aggregate(*quantized, **asmk.params["build_ivf"]["aggregate"])
-            with (globals["exp_path"] / f"eval/{dataset_name}.agg{partition['suffix']}.pkl").open("wb") as handle:
-                pickle.dump(dict(zip(["des", "word_ids", "image_ids"], aggregated)), handle)
+            agg_path = globals["exp_path"] / f"eval/{database_name}.agg{partition['suffix']}.pkl"
+            asmk_aggregate_database(net, inference, globals, logger, asmk=asmk, images=images,
+                                    partition=partition, cache_path=agg_path)
 
         # Build ivf
-        if multistep['step'] == "build_ivf":
-            builder = asmk.create_ivf_builder(cache_path=globals["exp_path"] / f"eval/{dataset_name}.ivf.pkl")
-            if not builder.loaded_from_cache:
-                for path in sorted(globals["exp_path"].glob(f"eval/{dataset_name}.agg*.pkl")):
-                    with path.open("rb") as handle:
-                        des = pickle.load(handle)
-                    builder.ivf.add(des['des'], des['word_ids'], des['image_ids'])
-                    logger.info(path) # DEBUG purpose only
-            asmk_dataset = asmk.add_ivf_builder(builder)
-            logger.info(f"Indexed images in {asmk_dataset.metadata['build_ivf']['index_time']:.2f}s")
-            logger.debug(f"IVF stats: {asmk_dataset.metadata['build_ivf']['ivf_stats']}")
+        elif multistep['step'] == "build_ivf":
+            ivf_path = globals["exp_path"] / f"eval/{dataset_name}.ivf.pkl"
+            asmk_build_ivf(globals, logger, asmk=asmk, cache_path=ivf_path, database_name=database_name,
+                           distractors=distractors, distractors_path=distractors_path)
 
         # Query ivf
-        if multistep['step'] == "query_ivf":
+        elif multistep['step'] == "query_ivf":
             asmk_dataset = asmk.build_ivf(None, None, cache_path=globals["exp_path"] / f"eval/{dataset_name}.ivf.pkl")
             start, end = int(len(qimages)*partition['norm_start']), int(len(qimages)*partition['norm_end'])
             bbxs = bbxs[start:end] if bbxs is not None else None
-            qdset = ImagesFromList(root='', images=qimages[start:end], bbxs=bbxs, **data_opts)
-            qvecs, qimids, *_ = how_net.extract_vectors_local(net, qdset, globals["device"], **infer_opts)
-            qimids += start
-            metadata, images, ranks, scores = asmk_dataset.query_ivf(qvecs, qimids)
-            logger.debug(f"Average query time (quant+aggr+search) is {metadata['query_avg_time']:.3f}s")
+            results_path = globals["exp_path"] / f"eval/{dataset_name}.results{partition['suffix']}.pkl"
+            asmk_query_ivf(net, inference, globals, logger, dataset=dataset, asmk_dataset=asmk_dataset,
+                           qimages=qimages[start:end], bbxs=bbxs, gnd=gnd, results=results,
+                           cache_path=results_path, imid_offset=start)
 
-            if gnd is not None:
-                results[dataset] = score_helpers.compute_map_and_log(dataset, ranks.T, gnd, logger=logger)
-            else:
-                with (globals["exp_path"] / f"eval/{dataset_name}.results{partition['suffix']}.pkl").open("wb") as handle:
-                    pickle.dump({"metadata": metadata, "images": images, "ranks": ranks, "scores": scores}, handle)
+        # All 3 dataset steps
+        elif multistep['step'] == "aggregate_build_query":
+            if multistep.get("partition"):
+                raise NotImplementedError("Partitions within step 'aggregate_build_query' are not" \
+                                          " supported, use separate steps")
+            results_path = globals["exp_path"] / "query_results.pkl"
+            if gnd is None and results_path.exists():
+                logger.debug("Step results already exist")
+                continue
+            asmk_dataset = asmk_index_database(net, inference, globals, logger, asmk=asmk, images=images,
+                                               distractors_path=distractors_path)
+            asmk_query_ivf(net, inference, globals, logger, dataset=dataset, asmk_dataset=asmk_dataset,
+                           qimages=qimages, bbxs=bbxs, gnd=gnd, results=results, cache_path=results_path)
 
-    logger.info(f"Finished asmk evaluation in {int(time.time()-time0) // 60} min")
+    logger.info(f"Finished asmk evaluation step '{multistep['step']}' in {int(time.time()-time0) // 60} min")
     return results
+
+#
+# Separate steps
+#
+
+def asmk_train_codebook(net, inference, globals, logger, *, codebook_training, asmk, cache_path):
+    """Asmk evaluation step 'train_codebook'"""
+    if cache_path and cache_path.exists():
+        return asmk.train_codebook(None, cache_path=cache_path)
+
+    images = data_helpers.load_dataset('train', data_root=globals['root_path'])[0]
+    images = images[:codebook_training['images']]
+    dset = ImagesFromList(root='', images=images, imsize=inference['image_size'], bbxs=None,
+                          transform=globals['transform'])
+    infer_opts = {"scales": codebook_training['scales'], "features_num": inference['features_num']}
+    des_train = how_net.extract_vectors_local(net, dset, globals["device"], **infer_opts)[0]
+    asmk = asmk.train_codebook(des_train, cache_path=cache_path)
+    logger.info(f"Codebook trained in {asmk.metadata['train_codebook']['train_time']:.1f}s")
+    return asmk
+
+def asmk_aggregate_database(net, inference, globals, logger, *, asmk, images, partition, cache_path):
+    """Asmk evaluation step 'aggregate_database'"""
+    if cache_path.exists():
+        logger.debug("Step results already exist")
+        return
+    codebook = asmk.codebook
+    kernel = kern_pkg.ASMKKernel(codebook, **asmk.params['build_ivf']['kernel'])
+    start, end = int(len(images)*partition['norm_start']), int(len(images)*partition['norm_end'])
+    data_opts = {"imsize": inference['image_size'], "transform": globals['transform']}
+    infer_opts = {"scales": inference['scales'], "features_num": inference['features_num']}
+    # Aggregate database
+    dset = ImagesFromList(root='', images=images[start:end], bbxs=None, **data_opts)
+    vecs, imids, *_ = how_net.extract_vectors_local(net, dset, globals["device"], **infer_opts)
+    imids += start
+    quantized = codebook.quantize(vecs, imids, **asmk.params["build_ivf"]["quantize"])
+    aggregated = kernel.aggregate(*quantized, **asmk.params["build_ivf"]["aggregate"])
+    with cache_path.open("wb") as handle:
+        pickle.dump(dict(zip(["des", "word_ids", "image_ids"], aggregated)), handle)
+
+def asmk_build_ivf(globals, logger, *, asmk, cache_path, database_name, distractors, distractors_path):
+    """Asmk evaluation step 'build_ivf'"""
+    if cache_path.exists():
+        logger.debug("Step results already exist")
+        return asmk.build_ivf(None, None, cache_path=cache_path)
+    builder = asmk.create_ivf_builder(cache_path=cache_path)
+    # Build ivf
+    if not builder.loaded_from_cache:
+        if distractors:
+            builder.initialize_with_distractors(distractors_path)
+            logger.debug(f"Loaded ivf with distractors '{distractors}'")
+        for path in sorted(globals["exp_path"].glob(f"eval/{database_name}.agg*.pkl")):
+            with path.open("rb") as handle:
+                des = pickle.load(handle)
+            builder.ivf.add(des['des'], des['word_ids'], des['image_ids'])
+            logger.info(f"Indexed '{path.name}'")
+    asmk_dataset = asmk.add_ivf_builder(builder)
+    logger.debug(f"IVF stats: {asmk_dataset.metadata['build_ivf']['ivf_stats']}")
+    return asmk_dataset
+
+def asmk_index_database(net, inference, globals, logger, *, asmk, images, distractors_path=None):
+    """Asmk evaluation step 'aggregate_database' and 'build_ivf'"""
+    data_opts = {"imsize": inference['image_size'], "transform": globals['transform']}
+    infer_opts = {"scales": inference['scales'], "features_num": inference['features_num']}
+    # Index database vectors
+    dset = ImagesFromList(root='', images=images, bbxs=None, **data_opts)
+    vecs, imids, *_ = how_net.extract_vectors_local(net, dset, globals["device"], **infer_opts)
+    asmk_dataset = asmk.build_ivf(vecs, imids, distractors_path=distractors_path)
+    logger.info(f"Indexed images in {asmk_dataset.metadata['build_ivf']['index_time']:.2f}s")
+    logger.debug(f"IVF stats: {asmk_dataset.metadata['build_ivf']['ivf_stats']}")
+    return asmk_dataset
+
+def asmk_query_ivf(net, inference, globals, logger, *, dataset, asmk_dataset, qimages, bbxs, gnd,
+                   results, cache_path, imid_offset=0):
+    """Asmk evaluation step 'query_ivf'"""
+    if gnd is None and cache_path and cache_path.exists():
+        logger.debug("Step results already exist")
+        return
+    data_opts = {"imsize": inference['image_size'], "transform": globals['transform']}
+    infer_opts = {"scales": inference['scales'], "features_num": inference['features_num']}
+    # Query vectors
+    qdset = ImagesFromList(root='', images=qimages, bbxs=bbxs, **data_opts)
+    qvecs, qimids, *_ = how_net.extract_vectors_local(net, qdset, globals["device"], **infer_opts)
+    qimids += imid_offset
+    metadata, query_ids, ranks, scores = asmk_dataset.query_ivf(qvecs, qimids)
+    logger.debug(f"Average query time (quant+aggr+search) is {metadata['query_avg_time']:.3f}s")
+    # Evaluate
+    if gnd is not None:
+        results[dataset] = score_helpers.compute_map_and_log(dataset, ranks.T, gnd, logger=logger)
+    with cache_path.open("wb") as handle:
+        pickle.dump({"metadata": metadata, "query_ids": query_ids, "ranks": ranks, "scores": scores}, handle)
 
 #
 # Helpers

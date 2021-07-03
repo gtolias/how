@@ -31,5 +31,6 @@ evaluation:
   # # Multistep Execution (data will be saved after each step to disk)
   #
   # multistep:
-  #   step: aggregate_database # Choose which step to execute in this run (valid steps: train_codebook, aggregate_database, build_ivf, query_ivf)
+  #   step: aggregate_database # Choose which step to execute in this run (valid steps: train_codebook, aggregate_database, build_ivf, query_ivf, aggregate_build_query)
   #   partition: "10_0" # The first partition out of 10 input data chunks will be processed (valid for aggregate_database and query_ivf steps only)
+  #   distractors: "revisitop1m" # Use the distractors from given inverted file (valid for build_ivf step only)

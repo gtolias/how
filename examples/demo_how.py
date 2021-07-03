@@ -43,6 +43,7 @@ def add_parameter_arguments(parser_train, parser_eval):
     parser_eval.add_argument("--step", metavar="STEP", dest="evaluation.multistep.step")
     parser_eval.add_argument("--partition", metavar="PARTITION", dest="evaluation.multistep.partition",
                              type=lambda x: tuple(int(y) for y in x.split("_")))
+    parser_eval.add_argument("--distractors", metavar="STEP", dest="evaluation.multistep.distractors")
 
 
 def main(args):
