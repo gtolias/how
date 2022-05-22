@@ -99,9 +99,9 @@ def eval_asmk(net, inference, globals, *, datasets, codebook_training, asmk):
         logger.info(f"Evaluating '{dataset_name}'")
 
         asmk_dataset = asmk_index_database(net, inference, globals, logger, asmk=asmk, images=images)
+        cache_path = (globals["exp_path"] / "query_results.pkl") if "exp_path" in globals else None
         asmk_query_ivf(net, inference, globals, logger, dataset=dataset, asmk_dataset=asmk_dataset,
-                       qimages=qimages, bbxs=bbxs, gnd=gnd, results=results,
-                       cache_path=globals["exp_path"] / "query_results.pkl")
+                       qimages=qimages, bbxs=bbxs, gnd=gnd, results=results, cache_path=cache_path)
 
     logger.info(f"Finished asmk evaluation in {int(time.time()-time0) // 60} min")
     return results

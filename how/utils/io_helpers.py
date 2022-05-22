@@ -42,15 +42,15 @@ def load_nested_templates(params, root_path):
     if not isinstance(params, dict):
         return params
 
+    for key, value in params.items():
+        params[key] = load_nested_templates(value, root_path)
+
     if "__template__" in params:
         template_path = os.path.expanduser(params.pop("__template__"))
         path = os.path.join(root_path, template_path)
         root_path = os.path.dirname(path)
         # Treat template as defaults
         params = dict_deep_overlay(load_params(path), params)
-
-    for key, value in params.items():
-        params[key] = load_nested_templates(value, root_path)
 
     return params
 
