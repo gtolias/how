@@ -8,9 +8,10 @@ from . import io_helpers
 def download_for_eval(evaluation, demo_eval, dataset_url, globals):
     """Download datasets for evaluation and network if given by url"""
     # Datasets
-    datasets = evaluation['global_descriptor']['datasets'] \
-                + evaluation['local_descriptor']['datasets']
-    download_datasets(datasets, dataset_url, globals)
+    if evaluation:
+        datasets = evaluation['global_descriptor']['datasets'] \
+                    + evaluation['local_descriptor']['datasets']
+        download_datasets(datasets, dataset_url, globals)
     # Network
     if demo_eval and (demo_eval['net_path'].startswith("http://") \
                         or demo_eval['net_path'].startswith("https://")):

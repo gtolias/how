@@ -79,12 +79,17 @@ class HOWNet(nn.Module):
 
     # Forward
 
+    @staticmethod
+    def scale_image(x, s):
+        """Return x image tensor scaled by a factor s"""
+        return nn.functional.interpolate(x, scale_factor=s, mode='bilinear', align_corners=False, recompute_scale_factor=True)
+
     def features_attentions(self, x, *, scales):
         """Return a tuple (features, attentions) where each is a list containing requested scales"""
         feats = []
         masks = []
         for s in scales:
-            xs = nn.functional.interpolate(x, scale_factor=s, mode='bilinear', align_corners=False)
+            xs = self.scale_image(x, s)
             o = self.features(xs)
             m = self.attention(o)
             if self.smoothing:
@@ -201,3 +206,15 @@ def extract_vectors_local(net, dataset, device, *, features_num, scales):
             imids.append(np.full((output[0].shape[0],), imid))
 
     return np.vstack(vecs), np.hstack(imids), np.hstack(strengths), np.vstack(locs), np.hstack(scls)
+
+
+def build_transforms(runtime):
+    """Build the torchvision transform to be used when loading data
+
+    :param dict runtime: Network runtime parameters
+    :return Callable: Torchvision transform
+    """
+    return torchvision.transforms.Compose([
+        torchvision.transforms.ToTensor(),
+        torchvision.transforms.Normalize(**dict(zip(["mean", "std"], runtime['mean_std'])))
+    ])

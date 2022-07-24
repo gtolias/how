@@ -59,7 +59,7 @@ Reproducing results from **Table 2.** with the publicly available models
 
 - R18<sub>how</sub>:
     - train: `examples/demo_how.py train examples/params/eccv20/train_how_r18.yml -e train_how_r18`
-    - eval (n = 1000): `examples/demo_how.py eval examples/params/eccv20/train_how_r18_1000.yml -ml train_how_r18`
+    - eval (n = 1000): `examples/demo_how.py eval examples/params/eccv20/eval_how_r18_1000.yml -ml train_how_r18`
 - -R50<sub>how</sub>:
     - train: `examples/demo_how.py train examples/params/eccv20/eval_how_r50-.yml -e train_how_r50-`
     - eval (n = 1000): `examples/demo_how.py eval examples/params/eccv20/eval_how_r50-_1000.yml -ml train_how_r50-`

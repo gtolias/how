@@ -31,6 +31,7 @@ def pcawhitenlearn_shrinkage(X, s=1.0):
     eigval = eigval[order]
     eigvec = eigvec[:, order]
 
+    eigval = np.clip(eigval, a_min=1e-14, a_max=None)
     P = np.dot(np.linalg.inv(np.diag(np.power(eigval, 0.5*s))), eigvec.T)
 
     return m, P.T

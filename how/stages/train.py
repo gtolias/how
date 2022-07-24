@@ -40,8 +40,7 @@ def train(demo_train, training, validation, model, globals):
 
     # Initialize network
     net = how_net.init_network(**model).to(globals["device"])
-    globals["transform"] = transforms.Compose([transforms.ToTensor(), \
-                transforms.Normalize(**dict(zip(["mean", "std"], net.runtime['mean_std'])))])
+    globals["transform"] = how_net.build_transforms(net.runtime)
     with logging.LoggingStopwatch("initializing network whitening", logger.info, logger.debug):
         initialize_dim_reduction(net, globals, **training['initialize_dim_reduction'])
 
@@ -50,15 +49,26 @@ def train(demo_train, training, validation, model, globals):
             initialize_training(net.parameter_groups(training["optimizer"]), training, globals)
     validation = Validation(validation, globals)
 
+    if not training['epochs']:
+        # Save offtheshelf
+        io_helpers.save_checkpoint({
+            'epoch': 0, 'meta': net.meta, 'state_dict': net.state_dict(),
+            'optimizer': optimizer.state_dict(), 'scheduler': scheduler.state_dict(),
+            'best_score': validation.best_score[1], 'scores': validation.scores,
+            'net_params': model, '_version': 'how/2020',
+        }, False, True, globals["exp_path"] / "epochs")
+        (globals["exp_path"] / "epochs/model_best.pth").symlink_to("model_epoch0.pth")
+
     for epoch in range(training['epochs']):
         epoch1 = epoch + 1
         set_seed(epoch1)
 
         time0 = time.time()
-        train_loss = train_epoch(train_loader, net, globals, criterion, optimizer, epoch1)
+        train_stats = train_epoch(train_loader, net, globals, criterion, optimizer, epoch1)
 
-        validation.add_train_loss(train_loss, epoch1)
-        validation.validate(net, epoch1)
+        validated = validation.validate(net, epoch1)
+        train_stats['epoch_durations'] = time.time() - time0
+        validation.add_train_stats(train_stats, epoch1)
 
         scheduler.step()
 
@@ -79,7 +89,7 @@ def train_epoch(train_loader, net, globals, criterion, optimizer, epoch1):
     losses = data_helpers.AverageMeter()
 
     # Prepare epoch
-    train_loader.dataset.create_epoch_tuples(net)
+    avg_neg_dist = train_loader.dataset.create_epoch_tuples(net)
     net.train()
 
     end = time.time()
@@ -106,7 +116,7 @@ def train_epoch(train_loader, net, globals, criterion, optimizer, epoch1):
                         f'Data {data_time.val:.3f} ({data_time.avg:.3f})\t' \
                         f'Loss {losses.val:.4f} ({losses.avg:.4f})')
 
-    return losses.avg
+    return {"train_loss": losses.avg, "avg_neg_dist": avg_neg_dist}
 
 
 def set_seed(seed):
@@ -135,6 +145,25 @@ def initialize_training(net_parameters, training, globals):
             num_workers=how_net.NUM_WORKERS)
     return optimizer, scheduler, criterion, train_loader
 
+
+def load_checkpoint(state, net, optimizer, scheduler, validation, net_params, scheduler_params):
+    """Load state for all objects, return the loaded epoch index starting from 1 (0 if not loaded)"""
+    if not state:
+        return 0
+
+    io_helpers.assert_equal_filtered_keys(net_params, state['net_params'], ['architecture'])
+    io_helpers.assert_equal_filtered_keys(net.meta, state['meta'], ['architecture'])
+    net.load_state_dict(state['state_dict'])
+    optimizer.load_state_dict(state['optimizer'])
+    if 'scheduler' not in state:
+        # Backwards compatibility
+        state['scheduler'] = scheduler.__class__(optimizer, **scheduler_params,
+                                                 last_epoch=state['epoch']).state_dict()
+    scheduler.load_state_dict(state['scheduler'])
+    validation.scores.update(state['scores'])
+    assert validation.best_score[1] == state['best_score']
+    print(f">> Loaded epoch {state['epoch']}")
+    return state['epoch']
 
 
 def extract_train_descriptors(net, globals, *, images, features_num):
@@ -178,19 +207,25 @@ class Validation:
         self.frequencies = {x: y.pop("frequency") for x, y in validations.items()}
         self.validations = validations
         self.globals = globals
-        self.scores = {x: defaultdict(list) for x in validations}
-        self.scores["train_loss"] = []
+        self.scores = defaultdict(list)
+        self.scores.update({x: defaultdict(list) for x in validations})
 
-    def add_train_loss(self, loss, epoch):
-        """Store training loss for given epoch"""
-        self.scores['train_loss'].append((epoch, loss))
+    def add_train_stats(self, stats, epoch):
+        """Store training stats (e.g. train_loss) for given epoch"""
+        for stat, val in stats.items():
+            self.scores[stat].append((epoch, val))
 
-        fig = plots.EpochFigure("train set", ylabel="loss")
-        fig.plot(*list(zip(*self.scores["train_loss"])), 'o-', label='train')
-        fig.save(self.globals['exp_path'] / "fig_train.jpg")
+        if "train_loss" in self.scores:
+            fig = plots.EpochFigure("train set", ylabel="loss")
+            fig.plot(*list(zip(*self.scores["train_loss"])), 'o-', label='train')
+            fig.save(self.globals['exp_path'] / "fig_train.jpg")
 
     def validate(self, net, epoch):
         """Perform validation of the network and store the resulting score for given epoch"""
+        net.eval()
+        # Free torch cached gpu mem for faiss
+        torch.cuda.empty_cache()
+        validated = False
         for name, frequency in self.frequencies.items():
             if frequency and epoch % frequency == 0:
                 scores = self.methods[name](net, net.runtime, self.globals, **self.validations[name])
@@ -209,6 +244,8 @@ class Validation:
                         if dataset != "val_eccv20":
                             fig.plot(*list(zip(*value)), 'o-', label=dataset)
                     fig.save(self.globals['exp_path'] / f"fig_test_{name}.jpg")
+                validated = True
+        return validated
 
     @property
     def decisive_scores(self):

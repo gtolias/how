@@ -39,17 +39,18 @@ def evaluate_demo(demo_eval, evaluation, globals):
     state = _convert_checkpoint(torch.load(net_path, map_location='cpu'))
     net = how_net.init_network(**state['net_params']).to(globals['device'])
     net.load_state_dict(state['state_dict'])
-    globals["transform"] = transforms.Compose([transforms.ToTensor(), \
-                transforms.Normalize(**dict(zip(["mean", "std"], net.runtime['mean_std'])))])
+    globals["transform"] = how_net.build_transforms(net.runtime)
 
     # Eval
+    results = {}
     if evaluation['global_descriptor']['datasets']:
-        eval_global(net, evaluation['inference'], globals, **evaluation['global_descriptor'])
+        results['global'] = eval_global(net, evaluation['inference'], globals, **evaluation['global_descriptor'])
 
     if evaluation['multistep']:
-        eval_asmk_multistep(net, evaluation['inference'], evaluation['multistep'], globals, **evaluation['local_descriptor'])
+        results['asmk'] = eval_asmk_multistep(net, evaluation['inference'], evaluation['multistep'], globals, **evaluation['local_descriptor'])
     elif evaluation['local_descriptor']['datasets']:
-        eval_asmk(net, evaluation['inference'], globals, **evaluation['local_descriptor'])
+        results['asmk'] = eval_asmk(net, evaluation['inference'], globals, **evaluation['local_descriptor'])
+    return results
 
 
 def eval_global(net, inference, globals, *, datasets):
@@ -99,7 +100,7 @@ def eval_asmk(net, inference, globals, *, datasets, codebook_training, asmk):
         logger.info(f"Evaluating '{dataset_name}'")
 
         asmk_dataset = asmk_index_database(net, inference, globals, logger, asmk=asmk, images=images)
-        cache_path = (globals["exp_path"] / "query_results.pkl") if "exp_path" in globals else None
+        cache_path = (globals["exp_path"] / f"{dataset}_queries.pkl") if "exp_path" in globals else None
         asmk_query_ivf(net, inference, globals, logger, dataset=dataset, asmk_dataset=asmk_dataset,
                        qimages=qimages, bbxs=bbxs, gnd=gnd, results=results, cache_path=cache_path)
 
@@ -179,7 +180,7 @@ def eval_asmk_multistep(net, inference, multistep, globals, *, datasets, codeboo
             if multistep.get("partition"):
                 raise NotImplementedError("Partitions within step 'aggregate_build_query' are not" \
                                           " supported, use separate steps")
-            results_path = globals["exp_path"] / "query_results.pkl"
+            results_path = globals["exp_path"] / f"{dataset}_queries.pkl"
             if gnd is None and results_path.exists():
                 logger.debug("Step results already exist")
                 continue

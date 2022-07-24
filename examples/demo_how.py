@@ -30,6 +30,8 @@ def add_parameter_arguments(parser_train, parser_eval):
     parser_train.add_argument("--skip-layer", metavar="ARCH", dest="model.skip_layer", type=int)
     parser_train.add_argument("--loss-margin", "-lm", metavar="MARGIN", dest="training.loss.margin",
                               type=float)
+    parser_train.add_argument("--data-folder", metavar="PATH", dest="demo_train.data_folder")
+    parser_train.add_argument("--exp-folder", metavar="PATH", dest="demo_train.exp_folder")
 
     # Eval
     parser_eval.add_argument("--experiment", "-e", metavar="NAME", dest="experiment")
@@ -44,6 +46,8 @@ def add_parameter_arguments(parser_train, parser_eval):
     parser_eval.add_argument("--partition", metavar="PARTITION", dest="evaluation.multistep.partition",
                              type=lambda x: tuple(int(y) for y in x.split("_")))
     parser_eval.add_argument("--distractors", metavar="STEP", dest="evaluation.multistep.distractors")
+    parser_eval.add_argument("--data-folder", metavar="PATH", dest="demo_eval.data_folder")
+    parser_eval.add_argument("--exp-folder", metavar="PATH", dest="demo_eval.exp_folder")
 
 
 def main(args):

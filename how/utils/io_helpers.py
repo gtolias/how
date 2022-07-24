@@ -1,6 +1,6 @@
 """Helper functions related to io"""
 
-import os.path
+import os
 import sys
 import shutil
 import urllib.request
@@ -96,10 +96,24 @@ def download_files(names, root_path, base_url, logfunc=None):
 def save_checkpoint(state, is_best, keep_epoch, directory):
     """Save state dictionary to the directory providing whether the corresponding epoch is the best
         and whether to keep it anyway"""
-    filename = os.path.join(directory, 'model_epoch%d.pth' % state['epoch'])
-    filename_best = os.path.join(directory, 'model_best.pth')
+    path_epoch = os.path.join(directory, 'model_epoch%d.pth' % state['epoch'])
+    path_best = os.path.join(directory, 'model_best.pth')
     if is_best and keep_epoch:
-        torch.save(state, filename)
-        shutil.copyfile(filename, filename_best)
+        torch.save(state, path_epoch)
+        shutil.copyfile(path_epoch, path_best)
     elif is_best or keep_epoch:
-        torch.save(state, filename_best if is_best else filename)
+        torch.save(state, path_best if is_best else path_epoch)
+
+def last_checkpoint_state_dict(directory):
+    """Load the last checkpoint in a directory"""
+    epochs = [int(x[len("model_epoch"):-len(".pth")]) for x in os.listdir(directory)
+                if x.startswith("model_epoch") and x.endswith(".pth")]
+    if not epochs:
+        return None
+    return torch.load(f"{directory}/model_epoch{sorted(epochs)[-1]}.pth")
+
+def assert_equal_filtered_keys(col1, col2, excluded_keys):
+    """Compare two dictionaries while excluding defined keys from the comparison"""
+    col1 = {x: y for x, y in col1.items() if x not in excluded_keys}
+    col2 = {x: y for x, y in col2.items() if x not in excluded_keys}
+    assert col1 == col2, f"{col1} != {col2}"
