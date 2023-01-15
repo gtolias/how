@@ -54,7 +54,7 @@ def load_dataset(dataset, data_root=''):
         images = [cfg['im_fname'](cfg, i) for i in range(cfg['n'])]
         qimages = [cfg['qim_fname'](cfg, i) for i in range(cfg['nq'])]
         if 'bbx' in cfg['gnd'][0].keys():
-            bbxs = [tuple(cfg['gnd'][i]['bbx']) for i in range(cfg['nq'])]
+            bbxs = [tuple(cfg['gnd'][i]['bbx']) if cfg['gnd'][i]['bbx'] is not None else cfg['gnd'][i]['bbx'] for i in range(cfg['nq'])]
         else:
             bbxs = None
         gnd = cfg['gnd']

@@ -279,8 +279,9 @@ def asmk_query_ivf(net, inference, globals, logger, *, dataset, asmk_dataset, qi
     # Evaluate
     if gnd is not None:
         results[dataset] = score_helpers.compute_map_and_log(dataset, ranks.T, gnd, logger=logger)
-    with cache_path.open("wb") as handle:
-        pickle.dump({"metadata": metadata, "query_ids": query_ids, "ranks": ranks, "scores": scores}, handle)
+    if cache_path:
+        with cache_path.open("wb") as handle:
+            pickle.dump({"metadata": metadata, "query_ids": query_ids, "ranks": ranks, "scores": scores}, handle)
 
 #
 # Helpers

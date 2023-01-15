@@ -41,8 +41,9 @@ def train(demo_train, training, validation, model, globals):
     # Initialize network
     net = how_net.init_network(**model).to(globals["device"])
     globals["transform"] = how_net.build_transforms(net.runtime)
-    with logging.LoggingStopwatch("initializing network whitening", logger.info, logger.debug):
-        initialize_dim_reduction(net, globals, **training['initialize_dim_reduction'])
+    if training['initialize_dim_reduction'] is not False:
+        with logging.LoggingStopwatch("initializing network whitening", logger.info, logger.debug):
+            initialize_dim_reduction(net, globals, **training['initialize_dim_reduction'])
 
     # Initialize training
     optimizer, scheduler, criterion, train_loader = \
@@ -99,10 +100,7 @@ def train_epoch(train_loader, net, globals, criterion, optimizer, epoch1):
 
         num_images = len(input[0]) # number of images per tuple
         for inp, trg in zip(input, target):
-            output = torch.zeros(net.meta['outputdim'], num_images).to(globals["device"])
-            for imi in range(num_images):
-                output[:, imi] = net(inp[imi].to(globals["device"])).squeeze()
-            loss = criterion(output, trg.to(globals["device"]))
+            loss = process_batch(net, criterion, inp, trg, globals['device'])
             loss.backward()
             losses.update(loss.item())
 
@@ -117,6 +115,13 @@ def train_epoch(train_loader, net, globals, criterion, optimizer, epoch1):
                         f'Loss {losses.val:.4f} ({losses.avg:.4f})')
 
     return {"train_loss": losses.avg, "avg_neg_dist": avg_neg_dist}
+
+def process_batch(net, criterion, input, target, device):
+    num_images = len(input)
+    output = torch.zeros(net.meta['outputdim'], num_images).to(device)
+    for imi in range(num_images):
+        output[:, imi] = net(input[imi].to(device)).squeeze()
+    return criterion(output, target.to(device))
 
 
 def set_seed(seed):
@@ -275,4 +280,4 @@ class Validation:
         for name in ["local_descriptor", "global_descriptor"]:
             if self.frequencies[name] and "val_eccv20" in self.scores[name]:
                 aggr = max
-        return aggr(decisive_scores, key=lambda x: x[1])
+        return aggr(decisive_scores, key=lambda x: float(x[1]))
