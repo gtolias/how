@@ -96,10 +96,10 @@ def main(args):
     io_helpers.save_params(globals["exp_path"] / f"{args.command}_params.yml", params)
     if args.command == "eval":
         download.download_for_eval(params['evaluation'], params['demo_eval'], DATASET_URL, globals)
-        evaluate.evaluate_demo(**params, globals=globals)
-    elif args.command == "train":
+        return evaluate.evaluate_demo(**params, globals=globals)
+    if args.command == "train":
         download.download_for_train(params['validation'], DATASET_URL, globals)
-        train.train(**params, globals=globals)
+        return train.train(**params, globals=globals)
 
 
 def _overwrite_cirtorch_path(root_path):

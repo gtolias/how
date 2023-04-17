@@ -132,18 +132,23 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
+def initialize_loss(loss, device):
+    """Initialize loss Module"""
+    assert training['loss'].keys() == {"margin"}
+    return ContrastiveLoss(**loss).to(device)
+
+
 def initialize_training(net_parameters, training, globals):
     """Initialize classes necessary for training"""
     # Need to check for keys because of defaults
     assert training['optimizer'].keys() == {"lr", "weight_decay"}
     assert training['lr_scheduler'].keys() == {"gamma"}
-    assert training['loss'].keys() == {"margin"}
     assert training['dataset'].keys() == {"name", "mode", "imsize", "nnum", "qsize", "poolsize"}
     assert training['loader'].keys() == {"batch_size"}
 
     optimizer = torch.optim.Adam(net_parameters, **training["optimizer"])
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, **training["lr_scheduler"])
-    criterion = ContrastiveLoss(**training["loss"]).to(globals["device"])
+    criterion = initialize_loss(training['loss'], globals['device'])
     train_dataset = TuplesDataset(**training['dataset'], transform=globals["transform"])
     train_loader = torch.utils.data.DataLoader(train_dataset, **training['loader'], \
             pin_memory=True, drop_last=True, shuffle=True, collate_fn=collate_tuples, \
@@ -214,6 +219,10 @@ class Validation:
         self.globals = globals
         self.scores = defaultdict(list)
         self.scores.update({x: defaultdict(list) for x in validations})
+
+    def add_train_loss(self, train_loss, epoch):
+        """Store training loss only for given epoch"""
+        self.add_train_stats({"train_loss": train_loss}, epoch)
 
     def add_train_stats(self, stats, epoch):
         """Store training stats (e.g. train_loss) for given epoch"""
